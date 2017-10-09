@@ -18,7 +18,7 @@ fn main() {
 
     let m = MultiProgress::new();
 
-    for s in styles.iter() {
+    for s in &styles {
         let pb = m.add(ProgressBar::new(512));
         pb.set_style(ProgressStyle::default_bar()
             .template(&format!("{{prefix:.bold}}▕{{bar:.{}}}▏{{msg}}", s.2))

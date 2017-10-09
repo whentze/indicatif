@@ -14,7 +14,7 @@ fn main() {
     let pb = m.add(ProgressBar::new(5));
     pb.set_style(sty.clone());
 
-    let m2 = m.clone();
+    let m2 = Arc::clone(&m);
     let _ = thread::spawn(move || {
         // make sure we show up at all.  otherwise no rendering
         // event.

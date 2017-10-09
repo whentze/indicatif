@@ -7,7 +7,7 @@ use console::{Style, measure_text_width};
 
 
 pub fn duration_to_secs(d: Duration) -> f64 {
-    d.as_secs() as f64 + d.subsec_nanos() as f64 / 1_000_000_000f64
+    d.as_secs() as f64 + f64::from(d.subsec_nanos()) / 1_000_000_000f64
 }
 
 pub fn secs_to_duration(s: f64) -> Duration {
@@ -90,7 +90,7 @@ impl<'a> TemplateVar<'a> {
     }
 }
 
-pub fn expand_template<'a, F: Fn(&TemplateVar) -> String>(s: &'a str, f: F) -> Cow<'a, str> {
+pub fn expand_template<F: Fn(&TemplateVar) -> String>(s: &str, f: F) -> Cow<str> {
     lazy_static! {
         static ref VAR_RE: Regex = Regex::new(
             r"(\}\})|\{(\{|[^}]+\})").unwrap();
@@ -129,7 +129,6 @@ pub fn expand_template<'a, F: Fn(&TemplateVar) -> String>(s: &'a str, f: F) -> C
                 var.key = short_key.as_str();
             }
             var.align = match opt_caps.get(2).map(|x| x.as_str()) {
-                Some("<") => Alignment::Left,
                 Some("^") => Alignment::Center,
                 Some(">") => Alignment::Right,
                 _ => Alignment::Left,
@@ -158,8 +157,8 @@ pub fn expand_template<'a, F: Fn(&TemplateVar) -> String>(s: &'a str, f: F) -> C
     })
 }
 
-pub fn pad_str<'a>(s: &'a str, width: usize,
-                   align: Alignment, truncate: bool) -> Cow<'a, str> {
+pub fn pad_str(s: &str, width: usize,
+                   align: Alignment, truncate: bool) -> Cow<str> {
     let cols = measure_text_width(s);
 
     if cols >= width {

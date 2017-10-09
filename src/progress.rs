@@ -103,6 +103,7 @@ impl ProgressDrawTarget {
     /// terminal is not user attended the entire progress bar will be
     /// hidden.  This is done so that piping to a file will not produce
     /// useless escape codes in that file.
+    #[cfg_attr(feature = "cargo-clippy", allow(wrong_self_convention))]
     pub fn to_term(term: Term, refresh_rate: Option<u64>) -> ProgressDrawTarget {
         let rate = refresh_rate.map(|x| Duration::from_millis(1000 / x));
         ProgressDrawTarget {
@@ -239,7 +240,7 @@ impl ProgressStyle {
         let fill = pct * width as f32;
         let head = if pct > 0.0 && !state.is_finished() { 1 } else { 0 };
 
-        let bar = repeat(state.style.progress_chars[0])
+        let done = repeat(state.style.progress_chars[0])
             .take(fill as usize).collect::<String>();
         let cur = if head == 1 {
             let n = state.style.progress_chars.len() - 2;
@@ -251,7 +252,7 @@ impl ProgressStyle {
         let bg = width.saturating_sub(fill as usize).saturating_sub(head);
         let rest = repeat(state.style.progress_chars.last().unwrap())
             .take(bg).collect::<String>();
-        format!("{}{}{}", bar, cur, alt_style.unwrap_or(&Style::new()).apply_to(rest))
+        format!("{}{}{}", done, cur, alt_style.unwrap_or(&Style::new()).apply_to(rest))
     }
 
     fn format_state(&self, state: &ProgressState) -> Vec<String> {
@@ -360,8 +361,7 @@ impl ProgressState {
     pub fn is_finished(&self) -> bool {
         match self.status {
             Status::InProgress => false,
-            Status::DoneVisible => true,
-            Status::DoneHidden => true,
+            Status::DoneVisible | Status::DoneHidden => true,
         }
     }
 
@@ -493,7 +493,7 @@ impl ProgressBar {
             return;
         }
 
-        let state_arc = self.state.clone();
+        let state_arc = Arc::clone(&self.state);
         state.tick_thread = Some(thread::spawn(move || {
             loop {
                 thread::sleep(Duration::from_millis(ms));
@@ -750,17 +750,17 @@ impl MultiProgress {
     /// The progress bar added will have the draw target changed to a
     /// remote draw target that is intercepted by the multi progress
     /// object.
-    pub fn add(&self, bar: ProgressBar) -> ProgressBar {
+    pub fn add(&self, prog_bar: ProgressBar) -> ProgressBar {
         let mut state = self.state.write();
         let idx = state.objects.len();
         state.objects.push(MultiObject {
             done: false,
             draw_state: None,
         });
-        bar.set_draw_target(ProgressDrawTarget {
+        prog_bar.set_draw_target(ProgressDrawTarget {
             kind: ProgressDrawTargetKind::Remote(idx, Mutex::new(self.tx.clone())),
         });
-        bar
+        prog_bar
     }
 
     /// Waits for all progress bars to report that they are finished.
@@ -814,13 +814,13 @@ impl MultiProgress {
             }
 
             let mut lines = vec![];
-            for obj in state.objects.iter() {
+            for obj in &state.objects {
                 if let Some(ref draw_state) = obj.draw_state {
                     lines.extend_from_slice(&draw_state.lines[..]);
                 }
             }
 
-            let finished = !state.objects.iter().any(|ref x| x.done);
+            let finished = !state.objects.iter().any(|x| x.done);
             state.draw_target.apply_draw_state(ProgressDrawState {
                 lines,
                 force_draw,
@@ -844,6 +844,12 @@ impl MultiProgress {
         self.joining.store(false, Ordering::Release);
 
         Ok(())
+    }
+}
+
+impl Default for MultiProgress {
+    fn default() -> Self {
+        MultiProgress::new()
     }
 }
 
