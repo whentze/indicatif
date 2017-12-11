@@ -17,7 +17,7 @@ use format::{FormattedDuration, HumanDuration, HumanBytes};
 /// Controls the rendering style of progress bars.
 #[derive(Clone)]
 pub struct ProgressStyle {
-    tick_chars: Vec<char>,
+    tick_chars: Vec<String>,
     progress_chars: Vec<char>,
     template: Cow<'static, str>,
 }
@@ -187,7 +187,10 @@ impl ProgressStyle {
     /// Returns the default progress bar style for bars.
     pub fn default_bar() -> ProgressStyle {
         ProgressStyle {
-            tick_chars: "⠁⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⠠⠠⠤⠦⠖⠒⠐⠐⠒⠓⠋⠉⠈⠈ ".chars().collect(),
+            tick_chars: "⠁⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⠠⠠⠤⠦⠖⠒⠐⠐⠒⠓⠋⠉⠈⠈ "
+                        .chars()
+                        .map(|c| c.to_string())
+                        .collect::<Vec<String>>(),
             progress_chars: "██░".chars().collect(),
             template: Cow::Borrowed("{wide_bar} {pos}/{len}"),
         }
@@ -196,7 +199,10 @@ impl ProgressStyle {
     /// Returns the default progress bar style for spinners.
     pub fn default_spinner() -> ProgressStyle {
         ProgressStyle {
-            tick_chars: "⠁⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⠠⠠⠤⠦⠖⠒⠐⠐⠒⠓⠋⠉⠈⠈ ".chars().collect(),
+            tick_chars: "⠁⠁⠉⠙⠚⠒⠂⠂⠒⠲⠴⠤⠄⠄⠤⠠⠠⠤⠦⠖⠒⠐⠐⠒⠓⠋⠉⠈⠈ "
+                        .chars()
+                        .map(|c| c.to_string())
+                        .collect::<Vec<String>>(),
             progress_chars: "██░".chars().collect(),
             template: Cow::Borrowed("{spinner} {msg}"),
         }
@@ -204,7 +210,15 @@ impl ProgressStyle {
 
     /// Sets the tick character sequence for spinners.
     pub fn tick_chars(mut self, s: &str) -> ProgressStyle {
-        self.tick_chars = s.chars().collect();
+        self.tick_chars = s.chars()
+                           .map(|c| c.to_string())
+                           .collect::<Vec<String>>();
+        self
+    }
+
+    /// Sets a sequence of multi-char strings for spinners
+    pub fn tick_chars_multi(mut self, s: &[&str]) -> ProgressStyle {
+        self.tick_chars = s.iter().map(|&s| s.to_owned()).collect::<Vec<String>>();
         self
     }
 
@@ -225,12 +239,20 @@ impl ProgressStyle {
 
     /// Returns the tick char for a given number.
     pub fn get_tick_char(&self, idx: u64) -> char {
-        self.tick_chars[(idx as usize) % (self.tick_chars.len() - 1)]
+        self.tick_chars[(idx as usize) % (self.tick_chars.len() - 1)].chars().next().unwrap()
     }
 
     /// Returns the tick char for the finished state.
     pub fn get_final_tick_char(&self) -> char {
-        self.tick_chars[self.tick_chars.len() - 1]
+        self.tick_chars[self.tick_chars.len() - 1].chars().next().unwrap()
+    }
+
+    fn get_tick_str(&self, idx: u64) -> &str {
+        &self.tick_chars[(idx as usize) % (self.tick_chars.len() - 1)]
+    }
+
+    fn get_final_tick_str(&self) -> &str {
+        &self.tick_chars[self.tick_chars.len() - 1]
     }
 
     fn format_bar(&self, state: &ProgressState, width: usize,
@@ -271,7 +293,7 @@ impl ProgressStyle {
                     self.format_bar(state, var.width.unwrap_or(20),
                                     var.alt_style.as_ref())
                 } else if key == "spinner" {
-                    state.current_tick_char().to_string()
+                    state.current_tick_str().to_string()
                 } else if key == "wide_msg" {
                     *wide_element.borrow_mut() = Some(
                         var.duplicate_for_key("msg"));
@@ -348,11 +370,23 @@ struct ProgressState {
 impl ProgressState {
     /// Returns the character that should be drawn for the
     /// current spinner character.
+    /// In case of a multi-character spinner,
+    /// returns the first character of the current spinner string.
     pub fn current_tick_char(&self) -> char {
         if self.is_finished() {
             self.style.get_final_tick_char()
         } else {
             self.style.get_tick_char(self.tick)
+        }
+    }
+
+    /// Returns the &str that should be drawn for the
+    /// current spinner iteration.
+    pub fn current_tick_str(&self) -> &str {
+        if self.is_finished() {
+            self.style.get_final_tick_str()
+        } else {
+            self.style.get_tick_str(self.tick)
         }
     }
 
